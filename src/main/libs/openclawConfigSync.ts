@@ -6,6 +6,13 @@ import type { TelegramOpenClawConfig, DiscordOpenClawConfig } from '../im/types'
 import type { DingTalkOpenClawConfig, FeishuOpenClawConfig, QQOpenClawConfig, WecomOpenClawConfig } from '../im/types';
 import { resolveRawApiConfig } from './claudeSettings';
 import type { OpenClawEngineManager } from './openclawEngineManager';
+import type { McpToolManifestEntry } from './mcpServerManager';
+
+export type McpBridgeConfig = {
+  callbackUrl: string;
+  secret: string;
+  tools: McpToolManifestEntry[];
+};
 
 const mapExecutionModeToSandboxMode = (mode: CoworkExecutionMode): 'off' | 'non-main' | 'all' => {
   if (mode === 'local') return 'off';
@@ -58,6 +65,7 @@ type OpenClawConfigSyncDeps = {
   getFeishuConfig: () => FeishuOpenClawConfig | null;
   getQQConfig: () => QQOpenClawConfig | null;
   getWecomConfig: () => WecomOpenClawConfig | null;
+  getMcpBridgeConfig?: () => McpBridgeConfig | null;
 };
 
 export class OpenClawConfigSync {
@@ -69,6 +77,7 @@ export class OpenClawConfigSync {
   private readonly getFeishuConfig: () => FeishuOpenClawConfig | null;
   private readonly getQQConfig: () => QQOpenClawConfig | null;
   private readonly getWecomConfig: () => WecomOpenClawConfig | null;
+  private readonly getMcpBridgeConfig?: () => McpBridgeConfig | null;
 
   constructor(deps: OpenClawConfigSyncDeps) {
     this.engineManager = deps.engineManager;
@@ -79,6 +88,7 @@ export class OpenClawConfigSync {
     this.getFeishuConfig = deps.getFeishuConfig;
     this.getQQConfig = deps.getQQConfig;
     this.getWecomConfig = deps.getWecomConfig;
+    this.getMcpBridgeConfig = deps.getMcpBridgeConfig;
   }
 
   sync(reason: string): OpenClawConfigSyncResult {
@@ -87,12 +97,10 @@ export class OpenClawConfigSync {
     const apiResolution = resolveRawApiConfig();
 
     if (!apiResolution.config) {
-      return {
-        ok: false,
-        changed: false,
-        configPath,
-        error: apiResolution.error || 'OpenClaw config sync failed: model config is unavailable.',
-      };
+      // No API/model configured yet (fresh install).
+      // Write a minimal config so the gateway can start — it just won't have
+      // any model provider until the user configures one.
+      return this.writeMinimalConfig(configPath, reason);
     }
 
     const { baseURL, apiKey, model, apiType } = apiResolution.config;
@@ -188,11 +196,34 @@ export class OpenClawConfigSync {
                 ...(preinstalledPluginIds.includes('feishu-openclaw-plugin')
                   ? { feishu: { enabled: false } }
                   : {}),
+                'mcp-bridge': { enabled: true },
               },
             },
           }
-        : {}),
+        : {
+            plugins: {
+              entries: {
+                'mcp-bridge': { enabled: true },
+              },
+            },
+          }),
     };
+
+    // Sync MCP Bridge config into the plugin's own config section
+    // (root-level keys are rejected by OpenClaw's strict schema validation)
+    const mcpBridgeCfg = this.getMcpBridgeConfig?.();
+    if (mcpBridgeCfg && mcpBridgeCfg.tools.length > 0) {
+      const plugins = managedConfig.plugins as Record<string, unknown>;
+      const entries = plugins.entries as Record<string, Record<string, unknown>>;
+      entries['mcp-bridge'] = {
+        ...entries['mcp-bridge'],
+        config: {
+          callbackUrl: mcpBridgeCfg.callbackUrl,
+          secret: mcpBridgeCfg.secret,
+          tools: mcpBridgeCfg.tools,
+        },
+      };
+    }
 
     // Sync Telegram OpenClaw channel config
     const tgConfig = this.getTelegramOpenClawConfig?.();
@@ -417,6 +448,72 @@ export class OpenClawConfigSync {
         changed: true,
         configPath,
       };
+    } catch (error) {
+      return {
+        ok: false,
+        changed: false,
+        configPath,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Write a minimal openclaw.json that lets the gateway start without any
+   * model/provider configured.  The full config will be synced once the
+   * user sets up a model in the UI.
+   */
+  private writeMinimalConfig(configPath: string, _reason: string): OpenClawConfigSyncResult {
+    const preinstalledPluginIds = readPreinstalledPluginIds();
+
+    const minimalConfig: Record<string, unknown> = {
+      gateway: {
+        mode: 'local',
+      },
+      // Don't enable plugins in minimal config — plugin loading via jiti happens
+      // synchronously BEFORE the HTTP server binds, and can block gateway startup
+      // for minutes on a fresh install.  Plugins will be enabled when the user
+      // configures an API model and a full config sync runs.
+    };
+
+    const nextContent = `${JSON.stringify(minimalConfig, null, 2)}\n`;
+    let currentContent = '';
+    try {
+      currentContent = fs.readFileSync(configPath, 'utf8');
+    } catch {
+      currentContent = '';
+    }
+
+    // If the file already has a meaningful config (from a previous sync or
+    // user configuration), don't downgrade it to the minimal version.
+    // Check for models (API configured), plugin entries (IM channels like
+    // DingTalk/WeCom), or gateway.mode already set.
+    if (currentContent && currentContent !== nextContent) {
+      try {
+        const existing = JSON.parse(currentContent);
+        if (
+          existing.models?.providers ||
+          existing.plugins?.entries ||
+          existing.gateway?.mode
+        ) {
+          // Already has a config with substance — keep it.
+          return { ok: true, changed: false, configPath };
+        }
+      } catch {
+        // Malformed JSON — overwrite with minimal config.
+      }
+    }
+
+    if (currentContent === nextContent) {
+      return { ok: true, changed: false, configPath };
+    }
+
+    try {
+      ensureDir(path.dirname(configPath));
+      const tmpPath = `${configPath}.tmp-${Date.now()}`;
+      fs.writeFileSync(tmpPath, nextContent, 'utf8');
+      fs.renameSync(tmpPath, configPath);
+      return { ok: true, changed: true, configPath };
     } catch (error) {
       return {
         ok: false,

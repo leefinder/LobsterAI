@@ -106,23 +106,6 @@ interface CoworkApiConfig {
   apiType?: 'anthropic' | 'openai';
 }
 
-interface CoworkSandboxStatus {
-  supported: boolean;
-  runtimeReady: boolean;
-  imageReady: boolean;
-  downloading: boolean;
-  progress?: CoworkSandboxProgress;
-  error?: string | null;
-}
-
-interface CoworkSandboxProgress {
-  stage: 'runtime' | 'image';
-  received: number;
-  total?: number;
-  percent?: number;
-  url?: string;
-}
-
 type OpenClawEnginePhase =
   | 'not_installed'
   | 'installing'
@@ -267,6 +250,7 @@ interface IElectronAPI {
     delete: (id: string) => Promise<{ success: boolean; servers?: McpServerConfigIPC[]; error?: string }>;
     setEnabled: (options: { id: string; enabled: boolean }) => Promise<{ success: boolean; servers?: McpServerConfigIPC[]; error?: string }>;
     fetchMarketplace: () => Promise<{ success: boolean; data?: McpMarketplaceData; error?: string }>;
+    refreshBridge: () => Promise<{ success: boolean; tools: number; error?: string }>;
   };
   api: {
     fetch: (options: {
@@ -358,9 +342,6 @@ interface IElectronAPI {
     }) => Promise<{ success: boolean; entry?: CoworkUserMemoryEntry; error?: string }>;
     deleteMemoryEntry: (input: { id: string }) => Promise<{ success: boolean; error?: string }>;
     getMemoryStats: () => Promise<{ success: boolean; stats?: CoworkMemoryStats; error?: string }>;
-    getSandboxStatus: () => Promise<CoworkSandboxStatus>;
-    installSandbox: () => Promise<{ success: boolean; status: CoworkSandboxStatus; error?: string }>;
-    onSandboxDownloadProgress: (callback: (data: CoworkSandboxProgress) => void) => () => void;
     onStreamMessage: (callback: (data: { sessionId: string; message: CoworkMessage }) => void) => () => void;
     onStreamMessageUpdate: (callback: (data: { sessionId: string; messageId: string; content: string }) => void) => () => void;
     onStreamPermission: (callback: (data: { sessionId: string; request: CoworkPermissionRequest }) => void) => () => void;
@@ -371,6 +352,7 @@ interface IElectronAPI {
   dialog: {
     selectDirectory: () => Promise<{ success: boolean; path: string | null }>;
     selectFile: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; path: string | null }>;
+    selectFiles: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; paths: string[] }>;
     saveInlineFile: (options: { dataBase64: string; fileName?: string; mimeType?: string; cwd?: string }) => Promise<{ success: boolean; path: string | null; error?: string }>;
     readFileAsDataUrl: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
   };

@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('electron', {
     delete: (id: string) => ipcRenderer.invoke('mcp:delete', id),
     setEnabled: (options: { id: string; enabled: boolean }) => ipcRenderer.invoke('mcp:setEnabled', options),
     fetchMarketplace: () => ipcRenderer.invoke('mcp:fetchMarketplace'),
+    refreshBridge: () => ipcRenderer.invoke('mcp:refreshBridge'),
   },
   permissions: {
     checkCalendar: () => ipcRenderer.invoke('permissions:checkCalendar'),
@@ -200,15 +201,6 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('cowork:memory:deleteEntry', input),
     getMemoryStats: () =>
       ipcRenderer.invoke('cowork:memory:getStats'),
-    getSandboxStatus: () =>
-      ipcRenderer.invoke('cowork:sandbox:status'),
-    installSandbox: () =>
-      ipcRenderer.invoke('cowork:sandbox:install'),
-    onSandboxDownloadProgress: (callback: (data: any) => void) => {
-      const handler = (_event: any, data: any) => callback(data);
-      ipcRenderer.on('cowork:sandbox:downloadProgress', handler);
-      return () => ipcRenderer.removeListener('cowork:sandbox:downloadProgress', handler);
-    },
     // Stream event listeners
     onStreamMessage: (callback: (data: { sessionId: string; message: any }) => void) => {
       const handler = (_event: any, data: { sessionId: string; message: any }) => callback(data);
@@ -245,6 +237,8 @@ contextBridge.exposeInMainWorld('electron', {
     selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
     selectFile: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) =>
       ipcRenderer.invoke('dialog:selectFile', options),
+    selectFiles: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) =>
+      ipcRenderer.invoke('dialog:selectFiles', options),
     saveInlineFile: (options: { dataBase64: string; fileName?: string; mimeType?: string; cwd?: string }) =>
       ipcRenderer.invoke('dialog:saveInlineFile', options),
     readFileAsDataUrl: (filePath: string) =>
