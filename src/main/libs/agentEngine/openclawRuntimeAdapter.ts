@@ -1138,6 +1138,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const client = new GatewayClient({
       url: connection.url,
       token: connection.token,
+      clientId: 'gateway-client',
       clientDisplayName: 'LobsterAI',
       clientVersion: app.getVersion(),
       mode: 'backend',

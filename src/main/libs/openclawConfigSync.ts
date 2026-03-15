@@ -179,6 +179,9 @@ export class OpenClawConfigSync {
       session: {
         dmScope: 'per-channel-peer',
       },
+      commands: {
+        ownerAllowFrom: ['webchat:gateway-client'],
+      },
       cron: {
         enabled: true,
         maxConcurrentRuns: 3,
