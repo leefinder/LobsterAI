@@ -556,8 +556,8 @@ export class OpenClawConfigSync {
       },
       skills: {
         entries: {
-          ...MANAGED_SKILL_ENTRY_OVERRIDES,
           ...this.buildSkillEntries(),
+          ...MANAGED_SKILL_ENTRY_OVERRIDES,
         },
         load: {
           extraDirs: this.resolveSkillsExtraDirs(),
@@ -954,8 +954,11 @@ export class OpenClawConfigSync {
       if (fs.statSync(userDataSkillsDir).isDirectory()) {
         return [userDataSkillsDir];
       }
-    } catch {
-      // Directory doesn't exist yet (e.g., fresh install before any skills sync).
+    } catch (err: unknown) {
+      // ENOENT is expected on fresh installs before any skills sync.
+      if (err && typeof err === 'object' && 'code' in err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.warn('[OpenClawConfigSync] Failed to stat SKILLs directory:', err);
+      }
     }
     return [];
   }
