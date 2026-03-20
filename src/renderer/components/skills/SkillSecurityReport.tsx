@@ -94,7 +94,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
       onClick={() => onAction('cancel')}
     >
       <div
-        className="w-full max-w-lg mx-4 rounded-2xl dark:bg-claude-darkBg bg-white shadow-xl border dark:border-claude-darkBorder border-claude-border overflow-hidden"
+        className="w-full max-w-xl mx-4 rounded-2xl dark:bg-claude-darkBg bg-white shadow-xl border dark:border-claude-darkBorder border-claude-border overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -174,7 +174,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
                                 {finding.file}{finding.line ? `:${finding.line}` : ''}
                               </p>
                               {finding.matchedPattern && (
-                                <p className="mt-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 font-mono text-[10px] dark:text-claude-darkTextSecondary text-claude-textSecondary break-all">
+                                <p className="mt-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 font-mono text-[10px] dark:text-claude-darkTextSecondary text-claude-textSecondary break-all overflow-x-auto max-h-16">
                                   {finding.matchedPattern}
                                 </p>
                               )}
