@@ -8,6 +8,7 @@ import {
   removeAgent,
 } from '../store/slices/agentSlice';
 import { setActiveSkillIds, clearActiveSkills } from '../store/slices/skillSlice';
+import { clearCurrentSession } from '../store/slices/coworkSlice';
 import type { Agent, PresetAgent } from '../types/agent';
 
 class AgentService {
@@ -143,6 +144,7 @@ class AgentService {
 
   switchAgent(agentId: string): void {
     store.dispatch(setCurrentAgentId(agentId));
+    store.dispatch(clearCurrentSession());
     const agent = store.getState().agent.agents.find((a) => a.id === agentId);
     if (agent?.skillIds?.length) {
       store.dispatch(setActiveSkillIds(agent.skillIds));

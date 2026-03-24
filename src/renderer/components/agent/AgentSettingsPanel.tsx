@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import { XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -8,9 +10,11 @@ import AgentSkillSelector from './AgentSkillSelector';
 interface AgentSettingsPanelProps {
   agentId: string | null;
   onClose: () => void;
+  onSwitchAgent?: (agentId: string) => void;
 }
 
-const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClose }) => {
+const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClose, onSwitchAgent }) => {
+  const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const [, setAgent] = useState<Agent | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -170,6 +174,15 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
             )}
           </div>
           <div className="flex gap-2">
+            {onSwitchAgent && agentId !== currentAgentId && (
+              <button
+                type="button"
+                onClick={() => onSwitchAgent(agentId)}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-claude-accent text-claude-accent hover:bg-claude-accent/10 transition-colors"
+              >
+                {i18nService.t('switchToAgent') || 'Use this Agent'}
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

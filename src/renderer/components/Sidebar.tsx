@@ -1,14 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
+import { agentService } from '../services/agent';
 import { coworkService } from '../services/cowork';
 import { i18nService } from '../services/i18n';
 import CoworkSessionList from './cowork/CoworkSessionList';
 import CoworkSearchModal from './cowork/CoworkSearchModal';
-import AgentList from './agent/AgentList';
-import AgentCreateModal from './agent/AgentCreateModal';
-import AgentPresetModal from './agent/AgentPresetModal';
-import AgentSettingsPanel from './agent/AgentSettingsPanel';
 import ComposeIcon from './icons/ComposeIcon';
 import ConnectorIcon from './icons/ConnectorIcon';
 import SearchIcon from './icons/SearchIcon';
@@ -16,16 +13,17 @@ import ClockIcon from './icons/ClockIcon';
 import PuzzleIcon from './icons/PuzzleIcon';
 import SidebarToggleIcon from './icons/SidebarToggleIcon';
 import TrashIcon from './icons/TrashIcon';
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
   onShowSettings: () => void;
   onShowLogin?: () => void;
-  activeView: 'cowork' | 'skills' | 'scheduledTasks' | 'mcp';
+  activeView: 'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'agents';
   onShowSkills: () => void;
   onShowCowork: () => void;
   onShowScheduledTasks: () => void;
   onShowMcp: () => void;
+  onShowAgents: () => void;
   onNewChat: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -39,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onShowCowork,
   onShowScheduledTasks,
   onShowMcp,
+  onShowAgents,
   onNewChat,
   isCollapsed,
   onToggleCollapse,
@@ -52,9 +51,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
-  const [isCreateAgentOpen, setIsCreateAgentOpen] = useState(false);
-  const [isPresetAgentOpen, setIsPresetAgentOpen] = useState(false);
-  const [agentSettingsId, setAgentSettingsId] = useState<string | null>(null);
   const isMac = window.electron.platform === 'darwin';
 
   useEffect(() => {
@@ -226,13 +222,26 @@ const Sidebar: React.FC<SidebarProps> = ({
             <ConnectorIcon className="h-4 w-4" />
             {i18nService.t('mcpServers')}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsSearchOpen(false);
+              onShowAgents();
+            }}
+            className={`w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
+              activeView === 'agents'
+                ? 'bg-claude-accent/10 text-claude-accent hover:bg-claude-accent/20'
+                : 'dark:text-claude-darkTextSecondary text-claude-textSecondary hover:text-claude-text dark:hover:text-claude-darkText hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover'
+            }`}
+          >
+            <UserGroupIcon className="h-4 w-4" />
+            {i18nService.t('myAgents')}
+          </button>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-2.5 pb-4">
-        <AgentList
-          onCreateAgent={() => setIsCreateAgentOpen(true)}
-          onAddPreset={() => setIsPresetAgentOpen(true)}
-          onAgentSettings={(id) => setAgentSettingsId(id)}
+        <SidebarAgentList
+          onShowCowork={onShowCowork}
         />
         <div className="px-3 pb-2 text-sm font-medium dark:text-claude-darkTextSecondary text-claude-textSecondary">
           {i18nService.t('coworkHistory')}
@@ -347,10 +356,55 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
       )}
-      <AgentCreateModal isOpen={isCreateAgentOpen} onClose={() => setIsCreateAgentOpen(false)} />
-      <AgentPresetModal isOpen={isPresetAgentOpen} onClose={() => setIsPresetAgentOpen(false)} />
-      <AgentSettingsPanel agentId={agentSettingsId} onClose={() => setAgentSettingsId(null)} />
     </aside>
+  );
+};
+
+/* ── Simplified agent list for sidebar quick-switch ─── */
+
+const SidebarAgentList: React.FC<{
+  onShowCowork: () => void;
+}> = ({ onShowCowork }) => {
+  const agents = useSelector((state: RootState) => state.agent.agents);
+  const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
+
+  useEffect(() => {
+    agentService.loadAgents();
+  }, []);
+
+  const enabledAgents = agents.filter((a) => a.enabled);
+
+  // Hide section if only the default main agent exists
+  if (enabledAgents.length <= 1 && !enabledAgents.some((a) => a.source === 'preset')) {
+    return null;
+  }
+
+  const handleSwitch = (agentId: string) => {
+    if (agentId === currentAgentId) return;
+    agentService.switchAgent(agentId);
+    coworkService.loadSessions(agentId);
+    onShowCowork();
+  };
+
+  return (
+    <div className="px-3 pb-2">
+      <div className="space-y-0.5">
+        {enabledAgents.map((agent) => (
+          <div
+            key={agent.id}
+            className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm cursor-pointer transition-colors ${
+              currentAgentId === agent.id
+                ? 'bg-claude-accent/10 text-claude-accent'
+                : 'dark:text-claude-darkTextSecondary text-claude-textSecondary hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover'
+            }`}
+            onClick={() => handleSwitch(agent.id)}
+          >
+            <span className="text-base leading-none">{agent.icon || '🦞'}</span>
+            <span className="truncate flex-1 text-xs font-medium">{agent.name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
