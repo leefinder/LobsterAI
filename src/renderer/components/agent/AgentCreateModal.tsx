@@ -3,6 +3,7 @@ import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import AgentSkillSelector from './AgentSkillSelector';
+import EmojiPicker from './EmojiPicker';
 
 interface AgentCreateModalProps {
   isOpen: boolean;
@@ -64,14 +65,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({ isOpen, onClose }) 
               {i18nService.t('agentName') || 'Name'} *
             </label>
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={icon}
-                onChange={(e) => setIcon(e.target.value)}
-                placeholder="🤖"
-                className="w-12 px-2 py-2 text-center rounded-lg border dark:border-claude-darkBorder border-claude-border bg-transparent dark:text-claude-darkText text-claude-text text-lg"
-                maxLength={4}
-              />
+              <EmojiPicker value={icon} onChange={setIcon} />
               <input
                 type="text"
                 value={name}
